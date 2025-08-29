@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spotify Wrapped — Ultimate (All Features)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root{
+      --spotify:#1DB954; --bg-1:#050505; --muted:#b8b8b8; --glass:rgba(255,255,255,0.06); --glass-2:rgba(255,255,255,0.12);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#050505,#071017);color:#fff}
+    .app{max-width:1200px;margin:0 auto;padding:28px}
+
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--spotify),#57f08a);display:grid;place-items:center;color:#012;box-shadow:0 8px 30px rgba(13,182,88,.08);font-weight:900}
+    .title{font-size:1.2rem;font-weight:700}
+
+    .controls{display:flex;gap:10px;align-items:center}
+    .btn{appearance:none;border:0;background:var(--spotify);color:#06240f;font-weight:800;padding:10px 14px;border-radius:999px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+    .btn.ghost{background:transparent;border:1px solid var(--glass-2);color:#fff}
+    .card{background:rgba(255,255,255,0.03);border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 12px 40px rgba(2,6,8,.5)}
+
+    .hero{display:grid;grid-template-columns:1fr 420px;gap:18px;align-items:center;margin-bottom:26px}
+    .hero-left h1{font-size:2rem;margin:0}
+    .hero-left p{color:var(--muted);margin:8px 0}
+
+    .phone{border-radius:22px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);box-shadow:0 18px 60px rgba(0,0,0,.6)}
+    .slides{position:relative;height:640px;display:flex;align-items:center;justify-content:center}
+    .slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;opacity:0;transform:translateY(18px) scale(.99);transition:all .45s ease}
+    .slide.active{opacity:1;transform:none}
+    .slide .kicker{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+    .slide .stat{font-size:3.6rem;font-weight:900;color:var(--spotify);margin:8px 0}
+
+    .nav{display:flex;align-items:center;gap:10px;padding:10px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.4))}
+    .progress{flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden}
+    .progress > i{display:block;height:100%;width:0;background:var(--spotify)}
+
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .list{max-height:420px;overflow:auto}
+    .item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px}
+    .item img{width:56px;height:56px;border-radius:8px;object-fit:cover}
+    .meta{color:var(--muted);font-size:.95rem}
+
+    /* charts */
+    .charts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+
+    /* heatmap */
+    .heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+    .heat-cell{height:36px;border-radius:6px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)}
+
+    /* theme picker */
+    .theme-select{padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff}
+
+    /* small helpers */
+    .muted{color:var(--muted)}
+    footer{margin-top:22px;color:var(--muted);font-size:.9rem}
+
+    /* responsive */
+    @media (max-width:1000px){ .hero{grid-template-columns:1fr} .grid,.charts{grid-template-columns:1fr} .slides{height:520px} }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo">W</div>
+        <div>
+          <div class="title">Wrapped — Ultimate</div>
+          <div class="muted">A custom Spotify recap with extra insights</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <select id="theme" class="theme-select">
+          <option value="spotify">Spotify</option>
+          <option value="neon">Neon</option>
+          <option value="pastel">Pastel</option>
+          <option value="dark">Dark</option>
+        </select>
+        <button id="btn-connect" class="btn"><i class="fa-brands fa-spotify"></i> Connect</button>
+        <button id="btn-url" class="btn ghost">Paste URL</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-left card">
+          <h1>Reimagined Wrapped — <span class="muted">All features enabled</span></h1>
+          <p>Animated story, deep charts, heatmap, mood timeline, playlist analyzer, discovery score, hidden gems, map, and sharing tools. Connect with the same auth method (popup + paste redirect URL) to start.</p>
+
+          <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+            <button id="start-story" class="btn">Start Story</button>
+            <button id="btn-deep-dive" class="btn ghost">Go to Deep Dive</button>
+            <button id="btn-export-png" class="btn ghost"><i class="fa-solid fa-image"></i> Export Card</button>
+            <button id="btn-export-md" class="btn ghost"><i class="fa-solid fa-file-lines"></i> Export Markdown</button>
+          </div>
+
+          <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:16px 0"/>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <input id="playlist-id" placeholder="Playlist ID for Analyzer" style="padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff;flex:1" />
+            <button id="analyze-playlist" class="btn ghost">Analyze</button>
+          </div>
+
+          <div style="margin-top:12px;color:var(--muted);font-size:.95rem">Tip: If you want a direct login popup to work without pasting URL, you need a redirect page on the same URL as your app and to configure the client on Spotify dashboard.</div>
+        </div>
+
+        <div class="phone card">
+          <div class="slides" id="slides-wrapper">
+            <!-- slides injected here -->
+          </div>
+          <div class="nav">
+            <button id="prev" class="btn ghost"><i class="fa-solid fa-chevron-left"></i></button>
+            <div class="progress"><i id="prog-fill"></i></div>
+            <button id="next" class="btn ghost"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- deep dive -->
+      <section id="deep" style="margin-top:20px">
+        <div class="grid">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3>Top Tracks</h3><span id="tracks-count" class="pill">—</span></div>
+            <div id="top-tracks" class="list"></div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3>Top Artists</h3><span id="artists-count" class="pill">—</span></div>
+            <div id="top-artists" class="list"></div>
+          </div>
+
+          <div class="card">
+            <h3>Genre Breakdown</h3>
+            <canvas id="chart-genres"></canvas>
+          </div>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div class="charts">
+          <div class="card">
+            <h4>Listening by Month</h4>
+            <canvas id="chart-months"></canvas>
+          </div>
+          <div class="card">
+            <h4>Mood Timeline (Valence)</h4>
+            <canvas id="chart-valence"></canvas>
+          </div>
+          <div class="card">
+            <h4>Audio Profile (Radar)</h4>
+            <canvas id="chart-radar"></canvas>
+          </div>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div class="grid">
+          <div class="card">
+            <h4>Listening Heatmap (recent days)</h4>
+            <div id="heatmap" class="heatmap"></div>
+          </div>
+
+          <div class="card">
+            <h4>Discovery & Streaks</h4>
+            <div id="discovery" style="margin-top:8px"></div>
+            <div id="streaks" style="margin-top:12px"></div>
+          </div>
+
+          <div class="card">
+            <h4>Top Skipped (placeholder)</h4>
+            <div id="skips" class="muted">Spotify doesn't expose skip counts via web API for user listens — this is a best-effort placeholder.</div>
+          </div>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div class="grid">
+          <div class="card">
+            <h4>Hidden Gems (low popularity)</h4>
+            <div id="hidden-gems" class="list"></div>
+          </div>
+          <div class="card">
+            <h4>Playlist Analyzer</h4>
+            <div id="playlist-analysis" class="muted">Enter playlist ID above and click Analyze.</div>
+          </div>
+          <div class="card">
+            <h4>Top Artists Map (manual geo)</h4>
+            <div id="map" style="height:220px;border-radius:8px;overflow:hidden"></div>
+            <div class="muted" style="margin-top:8px;font-size:.9rem">Map pins require geolocation data; this view will pin artists when available (manual lookup possible).</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="muted">Built with ❤️ — features: Genre Pie, Monthly timeline, Heatmap, Radar, Valence, Playlist Analyzer, Hidden Gems, Discovery Score, Streak Tracker, Skips placeholder, Map placeholder.</footer>
+  </div>
+
+  <audio id="preview"></audio>
+
+  <script>
+  // -------------------- AUTH (same method) --------------------
+  const CLIENT_ID = '6f1bcbe56bef45d28dec0ac09ca8c817';
+  const REDIRECT_URI = 'https://longno12.github.io/Spotify-Verify-Link-help/';
+  const SCOPE = 'user-top-read user-read-private user-read-recently-played playlist-modify-public';
+  const AUTH_URL = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&show_dialog=true`;
+
+  // helpers
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  // DOM refs
+  const btnConnect = $('#btn-connect');
+  const btnURL = $('#btn-url');
+  const startStory = $('#start-story');
+  const slidesWrapper = $('#slides-wrapper');
+  const prevBtn = $('#prev');
+  const nextBtn = $('#next');
+  const progFill = $('#prog-fill');
+  const deepBtn = $('#btn-deep-dive');
+  const exportPNG = $('#btn-export-png');
+  const exportMD = $('#btn-export-md');
+  const analyzePlaylist = $('#analyze-playlist');
+  const playlistIdInput = $('#playlist-id');
+
+  const topTracksEl = $('#top-tracks');
+  const topArtistsEl = $('#top-artists');
+  const tracksCount = $('#tracks-count');
+  const artistsCount = $('#artists-count');
+  const chartGenres = $('#chart-genres');
+  const chartMonths = $('#chart-months');
+  const chartValence = $('#chart-valence');
+  const chartRadar = $('#chart-radar');
+  const heatmapEl = $('#heatmap');
+  const discoveryEl = $('#discovery');
+  const streaksEl = $('#streaks');
+  const hiddenGemsEl = $('#hidden-gems');
+  const mapEl = $('#map');
+
+  let STATE = { token: null, profile: null, topTracks: null, topArtists: null, recent: null, features: null };
+  let slideEls = [];
+  let slideIndex = 0;
+  let charts = {};
+
+  function openAuth(){ window.open(AUTH_URL,'_blank','width=480,height=720'); alert('After allowing, copy the URL you are redirected to and paste it when prompted (the URL will contain #access_token=...).'); }
+
+  btnConnect.onclick = openAuth;
+  btnURL.onclick = ()=>{ const url = prompt('Paste the full redirect URL (the one with #access_token=...)'); if(url) processRedirectUrl(url); };
+
+  function processRedirectUrl(redirectUrl){ try{ const token = parseHash(redirectUrl); localStorage.setItem('spotify_token', token); STATE.token = token; fetchAllData(token); } catch(e){ alert('Invalid URL: '+e.message); } }
+
+  function parseHash(url){ const hash = (url.split('#')[1]||''); if(!hash) throw new Error('URL missing hash'); const params = new URLSearchParams(hash); const access = params.get('access_token'); if(!access) throw new Error('access_token missing'); return access; }
+
+  function tokenFromStorage(){ const t = localStorage.getItem('spotify_token'); return t || null; }
+
+  // small API wrapper
+  async function api(endpoint, token){ const res = await fetch('https://api.spotify.com/v1/'+endpoint, { headers: { Authorization: `Bearer ${token}` } }); if(res.status===401){ alert('Token expired or invalid. Please re-auth.'); localStorage.removeItem('spotify_token'); return null; } if(!res.ok){ const txt = await res.text(); throw new Error(`${endpoint} → ${res.status}: ${txt}`); } return res.json(); }
+
+  async function fetchAllData(token){
+    try{
+      STATE.profile = await api('me', token);
+      STATE.topTracks = await api('me/top/tracks?time_range=long_term&limit=50', token);
+      STATE.topArtists = await api('me/top/artists?time_range=long_term&limit=50', token);
+      STATE.recent = await api('me/player/recently-played?limit=50', token);
+
+      // audio features — try batch, fallback to per-track
+      const ids = (STATE.topTracks.items||[]).map(t=>t.id).filter(Boolean).slice(0,100).join(',');
+      try{ STATE.features = await api(`audio-features?ids=${encodeURIComponent(ids)}`, token); }
+      catch(e){ console.warn('Batch audio-features failed, trying per-track', e); const arr = await Promise.all((STATE.topTracks.items||[]).slice(0,50).map(async t=>{ try{ return await api(`audio-features/${t.id}`, token); } catch(e){ return null; } })); STATE.features = { audio_features: arr.filter(Boolean) }; }
+
+      // build UI
+      renderStory();
+      renderDeepDive();
+      if(STATE.profile) localStorage.setItem('last_profile', JSON.stringify(STATE.profile));
+    } catch(e){ console.error(e); alert('Error fetching data: '+e.message); }
+  }
+
+  // ---- Story building ----
+  function clearSlides(){ slidesWrapper.innerHTML=''; slideEls=[]; slideIndex=0; }
+  function pushSlide(html){ const s = document.createElement('div'); s.className='slide card'; s.innerHTML=html; slidesWrapper.appendChild(s); slideEls.push(s); }
+  function showSlide(i){ if(i<0||i>=slideEls.length) return; slideEls.forEach((s,idx)=> s.classList.toggle('active', idx===i)); slideIndex=i; progFill.style.width = ((i+1)/slideEls.length)*100 + '%'; }
+
+  function renderStory(){ clearSlides();
+    const p = STATE.profile || {};
+    pushSlide(`<div class="kicker">Presented by</div><img src="${p.images?.[0]?.url||''}" style="width:110px;height:110px;border-radius:50%;object-fit:cover;margin:8px 0"/><div style="font-weight:800;font-size:1.3rem">${escape(p.display_name||'Listener')}</div>`);
+
+    const minutes = Math.max(1, ((STATE.recent?.items||[]).reduce((a,i)=>a+(i.track?.duration_ms||0),0))/60000|0);
+    pushSlide(`<div class="kicker">You spent</div><div class="stat">${minutes}</div><div class="muted">minutes listening — approx ${Math.round(minutes/60)} hours</div>`);
+
+    // guess game
+    const options = shuffle((STATE.topTracks.items||[]).slice(0,8)).slice(0,4);
+    const top1 = (STATE.topTracks.items||[])[0] || null;
+    if(top1 && !options.some(o=>o.id===top1.id)){ options[0]=top1; shuffle(options); }
+    pushSlide(`<div class="kicker">Mini Game</div><div style="font-weight:800;margin:8px 0">Guess your #1 track</div><div style="display:grid;gap:8px;max-width:320px">${options.map(o=>`<button class="choice btn ghost" data-id="${o.id}">${escape(o.name)} — ${escape(o.artists?.[0]?.name||'')}</button>`).join('')}</div><div class="muted" style="margin-top:8px">Tap an option</div>`);
+
+    // top tracks
+    pushSlide(`<div><div class="kicker">Top Tracks</div><div style="font-weight:800;margin-top:8px">#1 ${escape(top1?.name||'—')}</div><div style="margin-top:8px">${(STATE.topTracks.items||[]).slice(0,5).map(t=>`<div style="margin:6px 0">${escape(t.name)} — ${escape(t.artists?.[0]?.name||'')}</div>`).join('')}</div></div>`);
+
+    // signature album if exists
+    const counts = {}; (STATE.topTracks.items||[]).forEach(t=> counts[t.album?.id] = (counts[t.album?.id]||0)+1);
+    const sig = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+    if(sig && counts[sig]>1){ const album = (STATE.topTracks.items||[]).find(t=>t.album?.id === sig)?.album; pushSlide(`<div class="kicker">Signature Album</div><img src="${album?.images?.[0]?.url||''}" style="width:60%;border-radius:12px;margin:10px 0"/><div style="font-weight:800">${escape(album?.name||'')}</div><div class="muted">${escape(album?.artists?.[0]?.name||'')}</div></div>`); }
+
+    // hidden gem
+    const hidden = [...(STATE.topTracks.items||[])].sort((a,b)=>a.popularity-b.popularity)[0];
+    if(hidden) pushSlide(`<div class="kicker">Hidden Gem</div><div style="font-weight:800;margin-top:8px">${escape(hidden.name)}</div><div class="muted">Popularity: ${hidden.popularity}</div>`);
+
+    // sonic day
+    const sd = sonicDay(STATE.recent?.items||[]);
+    pushSlide(`<div class="kicker">Sonic Day</div><div style="margin-top:8px">☕ Morning: ${escape(sd.Morning)}<br/>☀️ Afternoon: ${escape(sd.Afternoon)}<br/>🌙 Evening: ${escape(sd.Evening)}</div>`);
+
+    // final card
+    pushSlide(`<div id="share-card"><div class="kicker">${new Date().getFullYear()} Wrapped</div><div style="font-weight:800;margin:10px 0">${escape(p.display_name||'')}</div><div class="muted">Top Artist: ${escape((STATE.topArtists.items||[])[0]?.name||'—')}</div><div class="muted">Top Track: ${escape((STATE.topTracks.items||[])[0]?.name||'—')}</div></div>`);
+
+    // render
+    showSlide(0);
+
+    // attach slide interactions
+    slidesWrapper.onclick = (e)=>{
+      const choiceBtn = e.target.closest('.choice');
+      if(choiceBtn){ const id = choiceBtn.dataset.id; if(id === ((STATE.topTracks.items||[])[0]||{}).id){ choiceBtn.classList.add('correct'); setTimeout(()=>nextSlide(),800); } else { choiceBtn.classList.add('wrong'); const correct = [...slidesWrapper.querySelectorAll('.choice')].find(c=>c.dataset.id === ((STATE.topTracks.items||[])[0]||{}).id); if(correct) correct.classList.add('correct'); setTimeout(()=>nextSlide(),1200); } }
+    };
+  }
+
+  // ---- Deep dive ----
+  function renderDeepDive(){
+    // top tracks
+    // top tracks
+topTracksEl.innerHTML = (STATE.topTracks.items || []).slice(0, 20).map((t, i) => {
+  const img = (t.album?.images && t.album.images[2]?.url) ||
+              (t.album?.images && t.album.images[0]?.url) || '';
+  return `
+    <div class="item">
+      <img src="${img}"/>
+      <div style="flex:1">
+        <div style="font-weight:700">${i + 1}. ${escape(t.name)}</div>
+        <div class="meta">${escape(t.artists?.[0]?.name || '')}</div>
+      </div>
+      <div class="meta">${t.popularity}</div>
+    </div>
+  `;
+}).join('');
+tracksCount.textContent = (STATE.topTracks.items || []).length;
+
+// top artists
+topArtistsEl.innerHTML = (STATE.topArtists.items || []).slice(0, 20).map((a, i) => {
+  const img = (a.images && a.images[2]?.url) ||
+              (a.images && a.images[0]?.url) || '';
+  return `
+    <div class="item">
+      <img src="${img}"/>
+      <div style="flex:1">
+        <div style="font-weight:700">${i + 1}. ${escape(a.name)}</div>
+        <div class="meta">${escape((a.genres || [])[0] || 'Artist')}</div>
+      </div>
+      <div class="meta">${a.followers?.total?.toLocaleString?.() || ''}</div>
+    </div>
+  `;
+}).join('');
+artistsCount.textContent = (STATE.topArtists.items || []).length;
+
+
+    // genre breakdown
+    const genreCounts = {};
+    (STATE.topArtists.items||[]).forEach(a => (a.genres||[]).slice(0,2).forEach(g=> genreCounts[g] = (genreCounts[g]||0)+1));
+    const genreLabels = Object.keys(genreCounts).slice(0,6);
+    const genreData = genreLabels.map(l=>genreCounts[l]);
+    drawChart(chartGenres, 'pie', { labels: genreLabels, datasets:[{ data: genreData }] });
+
+    // months timeline from recent
+    const byMonth = {};
+    (STATE.recent?.items||[]).forEach(it=>{ const d = new Date(it.played_at); const key = `${d.getFullYear()}-${('0'+(d.getMonth()+1)).slice(-2)}`; byMonth[key] = (byMonth[key]||0)+1; });
+    const months = Object.keys(byMonth).sort();
+    drawChart(chartMonths, 'bar', { labels: months, datasets:[{ label:'Plays', data: months.map(m=>byMonth[m]) }] });
+
+    // valence timeline — use audio features for tracks that exist
+    const feats = STATE.features?.audio_features || [];
+    const valPoints = feats.map((f,i)=>({ x: i, y: (f?.valence||0) }));
+    drawChart(chartValence, 'line', { labels: valPoints.map((p,i)=>i+1), datasets:[{ label:'Valence', data: valPoints.map(p=>p.y), tension:0.3 }] });
+
+    // radar — average energy/dance/valence/speechiness/loudness-normalized
+    const avgEnergy = avg(feats.map(f=>f?.energy));
+    const avgDance = avg(feats.map(f=>f?.danceability));
+    const avgVal = avg(feats.map(f=>f?.valence));
+    const avgSpeech = avg(feats.map(f=>f?.speechiness));
+    const avgLoud = feats.length ? (avg(feats.map(f=>Math.max(0, Math.min(1, (f.loudness + 60)/60))))) : 0; // normalize loudness
+    drawChart(chartRadar, 'radar', { labels:['Energy','Dance','Valence','Speechiness','Loudness'], datasets:[{ data:[avgEnergy,avgDance,avgVal,avgSpeech,avgLoud] }] });
+
+    // heatmap (last 28 days) — count minutes per day
+    renderHeatmap((STATE.recent?.items||[]));
+
+    // discovery score: unique artists / total plays
+    const plays = (STATE.recent?.items||[]).length;
+    const uniqueArtists = new Set((STATE.recent?.items||[]).map(i=>i.track?.artists?.[0]?.name)).size;
+    discoveryEl.innerHTML = `<div>Discovery score: <strong>${(uniqueArtists/Math.max(1,plays)).toFixed(2)}</strong> (unique artists / plays)</div>`;
+
+    // streaks approximate — consecutive days with at least one play
+    const days = Array.from(new Set((STATE.recent?.items||[]).map(i=> new Date(i.played_at).toISOString().slice(0,10)))).sort();
+    const longest = calcLongestStreak(days);
+    streaksEl.innerHTML = `<div>Longest recent streak (approx): <strong>${longest} days</strong></div>`;
+
+    // hidden gems
+    const hidden = [...(STATE.topTracks.items||[])].sort((a,b)=>a.popularity-b.popularity).slice(0,8);
+    hiddenGemsEl.innerHTML = hidden.map(h=>`<div class="item"><img src="${h.album?.images?.[2]?.url||''}"/><div style="flex:1"><div style="font-weight:700">${escape(h.name)}</div><div class="meta">${escape(h.artists?.[0]?.name||'')}</div></div><div class="meta">${h.popularity}</div></div>`).join('');
+
+    // map — placeholder pins for top artists if we have manual coords saved in localStorage
+    renderMap((STATE.topArtists?.items||[]).slice(0,10));
+  }
+
+  function renderHeatmap(recentItems){
+    heatmapEl.innerHTML = '';
+    // build last 28 days
+    const today = new Date();
+    const days = [];
+    for(let i=27;i>=0;i--){ const d = new Date(); d.setDate(today.getDate()-i); days.push(d); }
+    const counts = {};
+    recentItems.forEach(it=>{ const day = new Date(it.played_at).toISOString().slice(0,10); counts[day] = (counts[day]||0) + (it.track?.duration_ms||0)/60000; });
+    days.forEach(d=>{ const key = d.toISOString().slice(0,10); const val = Math.round(counts[key]||0); const el = document.createElement('div'); el.className='heat-cell'; el.textContent = val>0?val+'m':''; const intensity = Math.min(1, (val/60)); el.style.background = `linear-gradient(180deg, rgba(29,185,84,${0.06 + intensity*0.5}), rgba(0,0,0,0.03))`; heatmapEl.appendChild(el); });
+  }
+
+  // simple map renderer (requires manual coordinates saved in `artist_geo` localStorage as {artistName:{lat,lng}})
+  function renderMap(artists){ mapEl.innerHTML=''; const map = L.map(mapEl).setView([20,0],2); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:''}).addTo(map);
+    const geo = JSON.parse(localStorage.getItem('artist_geo')||'{}');
+    artists.forEach(a=>{ const name = a.name; const g = geo[name]; if(g && g.lat && g.lng){ L.marker([g.lat,g.lng]).addTo(map).bindPopup(`${name}`); } });
+  }
+
+  function calcLongestStreak(sortedIsoDates){ if(!sortedIsoDates.length) return 0; // sorted array of dates (strings)
+    const set = new Set(sortedIsoDates);
+    let longest=0; for(const d of set){ let len=0; let cur=new Date(d); while(set.has(cur.toISOString().slice(0,10))){ len++; cur.setDate(cur.getDate()+1);} longest = Math.max(longest,len); } return longest; }
+
+  // ---- Playlist analyzer ----
+  analyzePlaylist.onclick = async ()=>{
+    const id = playlistIdInput.value.trim(); if(!id) return alert('Enter a playlist id');
+    const token = STATE.token || tokenFromStorage(); if(!token) return alert('Please connect first');
+    try{
+      const pl = await api(`playlists/${encodeURIComponent(id)}`, token);
+      const items = await api(`playlists/${encodeURIComponent(id)}/tracks?limit=100`, token);
+      const trackIds = items.items.map(it=>it.track?.id).filter(Boolean).slice(0,100).join(',');
+      const feats = trackIds ? (await api(`audio-features?ids=${encodeURIComponent(trackIds)}`, token)).audio_features : [];
+      const avgTempo = Math.round(avg(feats.map(f=>f?.tempo||0)));
+      const avgEnergy = avg(feats.map(f=>f?.energy||0)).toFixed(2);
+      const analysisHtml = `<div>Playlist: <strong>${escape(pl.name)}</strong></div><div class="muted">Tracks: ${items.items.length}</div><div style="margin-top:8px">Avg tempo: <strong>${avgTempo}</strong> — Energy: <strong>${avgEnergy}</strong></div>`;
+      $('#playlist-analysis').innerHTML = analysisHtml;
+    } catch(e){ alert('Playlist analyze error: '+e.message); }
+  };
+
+  // ---- utilities & charts ----
+  function drawChart(canvas, type, data){ if(!canvas) return; try{ if(charts[canvas.id]) charts[canvas.id].destroy(); charts[canvas.id] = new Chart(canvas.getContext('2d'), { type, data, options:{ responsive:true, plugins:{ legend:{ display: type !== 'pie' ? false : true } }, scales: { r:{ angleLines:{ color:'rgba(255,255,255,.12)' } } } } }); }catch(e){console.warn('chart err',e);} }
+  function escape(s=''){ return String(s||'').replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[ch])); }
+  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+  function avg(arr){ const a = arr.filter(v=>typeof v === 'number'); return a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0; }
+  function sonicDay(items){ const parts = {Morning:[],Afternoon:[],Evening:[]}; items.forEach(it=>{ const h = new Date(it.played_at).getHours(); if(h>=6 && h<12) parts.Morning.push(it); else if(h>=12 && h<18) parts.Afternoon.push(it); else parts.Evening.push(it); }); const top=(arr)=>{ if(!arr.length) return 'Silence'; const map={}; arr.forEach(it=>{ const n = it.track?.artists?.[0]?.name||'Unknown'; map[n]=(map[n]||0)+1; }); return Object.entries(map).sort((a,b)=>b[1]-a[1])[0]?.[0]||'Silence'; }; return { Morning: top(parts.Morning), Afternoon: top(parts.Afternoon), Evening: top(parts.Evening) }; }
+
+  // ---- export as PNG/MD ----
+  exportPNG.onclick = async ()=>{
+    const node = document.getElementById('share-card') || slidesWrapper.querySelector('.slide.active');
+    if(!node) return alert('No card to export');
+    const canvas = await html2canvas(node, { scale:2, backgroundColor:'#050505' });
+    const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = `wrapped_${Date.now()}.png`; a.click();
+  };
+  exportMD.onclick = ()=>{
+    const profile = STATE.profile || {}; const top = (STATE.topTracks?.items||[])[0] || {}; const artists = (STATE.topArtists?.items||[])[0] || {};
+    const md = `# ${profile.display_name || 'Listener'} Wrapped
+
+**Top Artist:** ${artists.name || '—'}
+**Top Track:** ${top.name || '—'}
+`;
+    const blob = new Blob([md], { type:'text/markdown' }); const u = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download='wrapped.md'; a.click(); URL.revokeObjectURL(u);
+  };
+
+  // ---- navigation ----
+  prevBtn.onclick = ()=> showSlide(Math.max(0, slideIndex-1));
+  nextBtn.onclick = ()=> { if(slideIndex === slideEls.length-1) renderDeepDive(); else showSlide(Math.min(slideEls.length-1, slideIndex+1)); };
+  deepBtn.onclick = ()=> renderDeepDive();
+  startStory.onclick = ()=> { const t = tokenFromStorage(); if(!t) return alert('Please connect first (popup then paste URL)'); if(!STATE.profile) fetchAllData(t); showSlide(0); };
+
+  // init — try token from storage
+  (function init(){ const t = tokenFromStorage(); if(t) { STATE.token = t; fetchAllData(t); } })();
+
+  // theme picker
+  $('#theme').onchange = function(){ document.body.dataset.theme = this.value; };
+
+  // small helper for map demo: allow user to set artist geos via console
+  window.__SAVE_ARTIST_GEO = function(name, lat, lng){ const g = JSON.parse(localStorage.getItem('artist_geo')||'{}'); g[name] = { lat, lng }; localStorage.setItem('artist_geo', JSON.stringify(g)); alert('Saved geo for '+name); };
+
+  </script>
+</body>
+</html>
+
